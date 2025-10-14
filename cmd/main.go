@@ -11,20 +11,20 @@ import (
 // 데이터 파일
 const dataFile = "data.json"
 
-// 구조체 선언 (json 인코딩으로 인해 앞에 대문자)
+// Task 구조체 선언 (json 인코딩으로 인해 앞에 대문자)
 type Task struct {
 	Id          int       `json:"id"`
 	Description string    `json:"description"`
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	NextId      int       `json:"nextid"` // -> TaskList 단위로 관리 필요
 }
 
-// 작업 버퍼용 배열 선언
-type TaskList []Task
+type TaskList []Task //작업 버퍼용 배열
 
 // 파일에서 데이터 읽어들임 json file -> TaskList
-// 파일 없으면 새로운 빈 배열 반환
+// 파일이 존재하지 않으면 새로운 빈 배열 반환
 func loadTasks(filename string) (TaskList, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -54,12 +54,27 @@ func saveTasks(filename string, tl TaskList) error {
 // add
 func (tl *TaskList) addTask(description string) {
 	now := time.Now()
+	if len(*tl) == 0 {
+		// If the list is empty, start IDs from 1
+		task := Task{
+			Id:          1,
+			Description: description,
+			Status:      "todo",
+			CreatedAt:   now,
+			UpdatedAt:   now,
+			NextId:      2,
+		}
+		*tl = append(*tl, task)
+		return
+	}
+	// Add new task with incremented ID
 	task := Task{
-		Id:          len(*tl) + 1,
+		Id:          (*tl)[len(*tl)-1].NextId,
 		Description: description,
 		Status:      "todo",
 		CreatedAt:   now,
 		UpdatedAt:   now,
+		NextId:      (*tl)[len(*tl)-1].NextId + 1,
 	}
 	*tl = append(*tl, task)
 }
@@ -80,7 +95,7 @@ func listTasks(filename string) {
 // delete
 
 func main() {
-	// positional argument
+	// positional argument 사용
 	flag.Parse()
 	var operation string = flag.Args()[0]
 	var description string
@@ -98,14 +113,16 @@ func main() {
 	// Perform operation based on the command
 	switch operation {
 	case "add":
-		fmt.Println("Add Task: \"", description, "\"")
+		// Add task
 		tempTaskList.addTask(description)
 		err := saveTasks(dataFile, tempTaskList)
 		if err != nil {
 			fmt.Println("Error saving tasks:", err)
 			return
 		}
+		fmt.Printf("Output: Task added successfully (ID: %d)\n", len(tempTaskList))
 	case "list":
+		// List tasks
 		listTasks(dataFile)
 	case "update":
 		// Update task
