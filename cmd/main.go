@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -52,8 +54,30 @@ func saveTasks(filename string, tl TaskList) error {
 	return os.WriteFile(filename, data, 0644)
 }
 
+// list all tasks
+func (tl *TaskList) listTasks(filter string) error {
+	if len(*tl) == 0 {
+		fmt.Println("No tasks found.")
+		return nil
+	}
+	if filter == "all" {
+		for _, task := range *tl {
+			fmt.Printf("ID: %d, Description: %s, Status: %s, CreatedAt: %s, UpdatedAt: %s\n", task.Id, task.Description, task.Status, task.CreatedAt, task.UpdatedAt)
+		}
+	} else if filter == "todo" || filter == "in-progress" || filter == "done" {
+		for _, task := range *tl {
+			if task.Status == filter {
+				fmt.Printf("ID: %d, Description: %s, Status: %s, CreatedAt: %s, UpdatedAt: %s\n", task.Id, task.Description, task.Status, task.CreatedAt, task.UpdatedAt)
+			}
+		}
+	} else {
+		return errors.New("Invalid filter. Use 'todo', 'in-progress', or 'done'.")
+	}
+	return nil
+}
+
 // Add new task with incremented ID
-func (tl *TaskList) addTask(description string) {
+func (tl *TaskList) addTask(description string) error {
 	now := time.Now()
 	var id, nextId int
 	if len(*tl) == 0 {
@@ -72,32 +96,95 @@ func (tl *TaskList) addTask(description string) {
 		NextId:      nextId,
 	}
 	*tl = append(*tl, task)
-}
-
-// list
-func (tl *TaskList) listTasks() {
-	for _, task := range *tl {
-		fmt.Printf("ID: %d, Description: %s, Status: %s, CreatedAt: %s, UpdatedAt: %s\n", task.Id, task.Description, task.Status, task.CreatedAt, task.UpdatedAt)
+	err := saveTasks(dataFile, *tl)
+	if err != nil {
+		fmt.Println("Error saving tasks:", err)
+		return err
 	}
+	return nil
 }
 
 // update
-func (tl *TaskList) updateTask(id int, description string, status string) {
+func (tl *TaskList) updateTask(id int, description string, status string) error {
 	// Implementation for updating a task
+	for idx, task := range *tl {
+		if task.Id == id {
+			task.Description = description
+			task.Status = status
+			task.UpdatedAt = time.Now()
+			(*tl)[idx] = task
+			err := saveTasks(dataFile, *tl)
+			if err != nil {
+				fmt.Println("Error saving tasks:", err)
+				return err
+			}
+			return nil
+		}
+	}
+	return errors.New("No such task")
 }
 
 // delete
-func (tl *TaskList) deleteTask(id int) {
+func (tl *TaskList) deleteTask(id int) error {
 	// Implementation for deleting a task
+	for i, task := range *tl {
+		if task.Id == id {
+			*tl = append((*tl)[:i], (*tl)[i+1:]...)
+			saveTasks(dataFile, *tl)
+			return nil
+		}
+	}
+	return errors.New("No such task")
+}
+
+func (tl *TaskList) markTask(id int, status string) error {
+	// Implementation for marking a task
+	for idx, task := range *tl {
+		if task.Id == id {
+			task.Status = status
+			task.UpdatedAt = time.Now()
+			(*tl)[idx] = task
+			err := saveTasks(dataFile, *tl)
+			if err != nil {
+				fmt.Println("Error saving tasks:", err)
+				return err
+			}
+			return nil
+		}
+	}
+	return errors.New("No such task")
 }
 
 func main() {
 	// positional argument parsing
 	flag.Parse()
 	var operation string = flag.Args()[0]
+	var id int
 	var description string
+	var status string
+	var filter string
+
+	// add description
 	if operation == "add" && len(flag.Args()) > 1 {
 		description = flag.Args()[1]
+		// update id description
+	} else if operation == "update" && len(flag.Args()) > 2 {
+		id, _ = strconv.Atoi(flag.Args()[1])
+		description = flag.Args()[2]
+		// delete id
+	} else if operation == "delete" && len(flag.Args()) > 1 {
+		id, _ = strconv.Atoi(flag.Args()[1])
+	} else if operation == "mark-in-progress" && len(flag.Args()) > 1 {
+		id, _ = strconv.Atoi(flag.Args()[1])
+		status = "in-progress"
+	} else if operation == "mark-done" && len(flag.Args()) > 1 {
+		id, _ = strconv.Atoi(flag.Args()[1])
+		status = "done"
+	} else if operation == "list" && len(flag.Args()) == 1 {
+		// no additional args needed
+		filter = "all"
+	} else if operation == "list" && len(flag.Args()) > 1 {
+		filter = flag.Args()[1]
 	}
 
 	// load existing tasks from file
@@ -111,24 +198,52 @@ func main() {
 	switch operation {
 	case "add":
 		// Add task
-		tempTaskList.addTask(description)
-		err := saveTasks(dataFile, tempTaskList)
+		err := tempTaskList.addTask(description)
 		if err != nil {
-			fmt.Println("Error saving tasks:", err)
+			fmt.Println("Error adding task:", err)
 			return
 		}
 		fmt.Printf("Output: Task added successfully (ID: %d)\n", len(tempTaskList))
 	case "list":
 		// List tasks
-		tempTaskList.listTasks()
+		err := tempTaskList.listTasks(filter)
+		if err != nil {
+			fmt.Println("Error listing tasks:", err)
+			return
+		}
 	case "update":
 		// Update task
-		fmt.Println("update")
+		err := tempTaskList.updateTask(id, description, status)
+		if err != nil {
+			fmt.Println("Error updating task:", err)
+			return
+		}
+		fmt.Println("Output: Task updated successfully")
 	case "delete":
 		// Delete task
-		fmt.Println("delete")
+		err := tempTaskList.deleteTask(id)
+		if err != nil {
+			fmt.Println("Error deleting task:", err)
+			return
+		}
+	case "mark-in-progress":
+		// Mark task as in-progress
+		err := tempTaskList.markTask(id, status)
+		if err != nil {
+			fmt.Println("Error marking task:", err)
+			return
+		}
+		fmt.Println("Output: Task marked as in-progress successfully")
+	case "mark-done":
+		// Mark task as done
+		err := tempTaskList.markTask(id, status)
+		if err != nil {
+			fmt.Println("Error marking task:", err)
+			return
+		}
+		fmt.Println("Output: Task marked as done successfully")
 	default:
 		// Invalid operation
-		fmt.Println("default")
+		fmt.Println("Invaild operation. Use add, list, update, or delete.")
 	}
 }
