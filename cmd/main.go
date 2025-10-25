@@ -164,29 +164,6 @@ func main() {
 	var status string
 	var filter string
 
-	// add description
-	if operation == "add" && len(flag.Args()) > 1 {
-		description = flag.Args()[1]
-		// update id description
-	} else if operation == "update" && len(flag.Args()) > 2 {
-		id, _ = strconv.Atoi(flag.Args()[1])
-		description = flag.Args()[2]
-		// delete id
-	} else if operation == "delete" && len(flag.Args()) > 1 {
-		id, _ = strconv.Atoi(flag.Args()[1])
-	} else if operation == "mark-in-progress" && len(flag.Args()) > 1 {
-		id, _ = strconv.Atoi(flag.Args()[1])
-		status = "in-progress"
-	} else if operation == "mark-done" && len(flag.Args()) > 1 {
-		id, _ = strconv.Atoi(flag.Args()[1])
-		status = "done"
-	} else if operation == "list" && len(flag.Args()) == 1 {
-		// no additional args needed
-		filter = "all"
-	} else if operation == "list" && len(flag.Args()) > 1 {
-		filter = flag.Args()[1]
-	}
-
 	// load existing tasks from file
 	tempTaskList, err := loadTasks(dataFile)
 	if err != nil {
@@ -198,6 +175,7 @@ func main() {
 	switch operation {
 	case "add":
 		// Add task
+		description = flag.Args()[1]
 		err := tempTaskList.addTask(description)
 		if err != nil {
 			fmt.Println("Error adding task:", err)
@@ -206,6 +184,11 @@ func main() {
 		fmt.Printf("Output: Task added successfully (ID: %d)\n", len(tempTaskList))
 	case "list":
 		// List tasks
+		if len(flag.Args()) == 1 {
+			filter = "all"
+		} else if len(flag.Args()) > 1 {
+			filter = flag.Args()[1]
+		}
 		err := tempTaskList.listTasks(filter)
 		if err != nil {
 			fmt.Println("Error listing tasks:", err)
@@ -213,6 +196,8 @@ func main() {
 		}
 	case "update":
 		// Update task
+		id, _ = strconv.Atoi(flag.Args()[1])
+		description = flag.Args()[2]
 		err := tempTaskList.updateTask(id, description, status)
 		if err != nil {
 			fmt.Println("Error updating task:", err)
@@ -221,6 +206,7 @@ func main() {
 		fmt.Println("Output: Task updated successfully")
 	case "delete":
 		// Delete task
+		id, _ = strconv.Atoi(flag.Args()[1])
 		err := tempTaskList.deleteTask(id)
 		if err != nil {
 			fmt.Println("Error deleting task:", err)
@@ -228,6 +214,8 @@ func main() {
 		}
 	case "mark-in-progress":
 		// Mark task as in-progress
+		id, _ = strconv.Atoi(flag.Args()[1])
+		status = "in-progress"
 		err := tempTaskList.markTask(id, status)
 		if err != nil {
 			fmt.Println("Error marking task:", err)
@@ -236,6 +224,8 @@ func main() {
 		fmt.Println("Output: Task marked as in-progress successfully")
 	case "mark-done":
 		// Mark task as done
+		id, _ = strconv.Atoi(flag.Args()[1])
+		status = "done"
 		err := tempTaskList.markTask(id, status)
 		if err != nil {
 			fmt.Println("Error marking task:", err)
@@ -244,6 +234,6 @@ func main() {
 		fmt.Println("Output: Task marked as done successfully")
 	default:
 		// Invalid operation
-		fmt.Println("Invaild operation. Use add, list, update, or delete.")
+		fmt.Println("Invaild operation. Use add, list, update, or delete, mark-in-progress, mark-done.")
 	}
 }
